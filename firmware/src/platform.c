@@ -209,7 +209,11 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)   /* 1: a message (st
 {
     uint32_t pk;
     if (mi_r == mi_w)
+#if FM1_USB_HOST
+        return uh_lost_get(st, d1, d2);         /* a USB device went with notes held: their note-offs (usb_host.c) */
+#else
         return 0;
+#endif
     pk = midi_in_q[mi_r % MQ];
     mi_r++;
     *st = (uint8_t)(pk >> 8);
@@ -313,6 +317,9 @@ static void platform_poll(void)
     static int32_t knob_avg = 512 * 16;
     int32_t a;
     fm1_wdt_feed();
+#if FM1_USB_HOST
+    uh_task(fm1_ms);                            /* before usb_retry: a host port is not retried as a device */
+#endif
     usb_retry(fm1_ms);
 #ifdef APP_SYSEX
     {

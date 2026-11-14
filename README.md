@@ -24,6 +24,16 @@
   <a href="ROADMAP.md">the roadmap</a>
 </p>
 
+> **This is a fork** of [joakimeriksson/fm1-dock](https://github.com/joakimeriksson/fm1-dock) that adds
+> **[USB HOST](#usb-host-this-fork)**: the FM-1's USB-C port as the host of a USB MIDI keyboard, controller or
+> synth, on at every power-on and switched off in OPTIONS. Everything else is fm1-dock's, and its page, catalog and
+> installer are upstream's. **The USB host code has passed its tests on a computer, against a model of the USB
+> controller. It has not yet been run on an FM-1 by this fork.**
+>
+> To install it, take `fm1-dock-…-usbhost….fwsc` from **this fork's** Releases and write it with
+> `python3 tools/fm1_install.py <file>.fwsc` (below); upstream's page installs upstream's fm1-dock, without USB HOST.
+> Modules, settings and presets stay, and upstream's catalog adds modules to it as to any fm1-dock.
+
 fm1-dock is installed once. The synths are modules in its flash: hold HOME, pick another one, play. No reinstall.
 Fifteen synths so far, each its author's own code: three come with it (and a sine), twelve more go in from the page
 with one click, and out again. Every one can be tried first, without an FM-1: its card's **Try it** runs it in the emulator on the page. Your own module deploys the same way, over USB in seconds, and when something goes wrong, the log, the
@@ -185,6 +195,7 @@ fm1-dock starts whatever played last. The options, for every module:
 | **KNOBS CC** | ON: KNOB1..4 send CC 74, 71, 73, 72 (cutoff, resonance, attack, release) over USB and BLE-MIDI instead of turning the module's knobs. OFF by default |
 | **AFTERTOUCH** | How the keys' pressure (and an external keyboard's poly or channel aftertouch) reaches the synth: **AS IS** (default) as it comes, per key; **CHANNEL** as channel pressure; **MOD WHL** as CC 1; **FILTER** as CC 74. The last three send the hardest-pressed key's pressure, for synths that do nothing with poly pressure. The MIDI sent out stays poly |
 | **MIDI THRU** | ON: the TRS MIDI jack's input (not clock or SysEx) goes on to USB-MIDI and BLE-MIDI, and the module plays it too. OFF by default |
+| **USB HOST** (the FM-1 only; this fork) | ON (the default, and kept): the USB-C port is the host of a USB MIDI device, [below](#usb-host-this-fork). OFF: the port is always a device, as in fm1-dock |
 | **ABOUT** | **SEL**: a page with the version (a release's `0.8.2 (abc1234)` with its source; any other build's is its source, git's short hash, `+` with changes not committed), the board and model, 1CPU / 2CPU, the chip, the flash chip's JEDEC id and size, the module RAM, the add-ons' free flash (all and the largest piece), the BLE address, and each module's name, version and KiB. **SELECT / PRESETS** scroll, **HOME** goes back |
 | **BLUETOOTH** | BLE-MIDI, OFF by default (below) |
 
@@ -204,6 +215,43 @@ cores keep running. A link that dies is let go and the FM-1 advertises again.
 (no Audio MIDI Setup), shows what it sends back, and tests the TRS jack with MIDI THRU ON: notes out of a USB-MIDI
 interface into the jack, timed as they come back over USB.
 
+### USB HOST (this fork)
+
+The FM-1's USB-C port can be the host of a class-compliant USB MIDI device instead of talking to a computer: a
+keyboard or a controller plays the module, and the FM-1's keys, knobs (KNOBS CC), MASTER CC7 and MIDI THRU go out to
+a synth on the port. **USB HOST** in OPTIONS is **ON by default and kept**: you do not switch it on again after
+every power-on.
+
+- **The port is not powered.** The FM-1 gives no 5 V, so what hangs on the port needs power of its own: a powered
+  hub or a powered USB-C OTG adapter. Full-speed devices only, a hub and one hub behind it. Two FM-1s on a plain
+  USB-C cable play each other: one with USB HOST ON, the other a device (OFF here, or any other firmware).
+- **A computer still finds the FM-1.** At power-on the port starts as a device, as ever, and becomes a host only
+  2.5 s later if no computer has spoken to it. So with the cable in a computer (or a phone) when you switch on, the
+  FM-1 stays a device until power-off and the line reads **PC**: the installer, the catalog, deploys, the console
+  and USB audio work as before. A computer plugged in *later*, with the port already a host, is not noticed: switch
+  USB HOST **OFF** (a device again within a second, no restart) or switch off and on.
+- **The line** reads **ON** (a host, looking), **MIDI** (a device plays), **PC** (a computer was found at power-on),
+  **HELD** (a safe start, or the start after a failed one: a device this time) or **OFF**. With the line selected,
+  the screen's last line says what the port sees: `LOOKING FOR A MIDI DEVICE`, `MIDI DEVICE CONNECTED`,
+  `NOTHING THERE: POWERED HUB?`, `NOT A USB MIDI DEVICE`, `DEVICE NOT ANSWERING`, `LOW-SPEED USB: NOT SUPPORTED`,
+  `HUB: NOTHING ON IT`, `HUB: NO MIDI DEVICE ON IT`. The log (the console) has the same, with what the search met.
+- **SEL** switches at once, either way. From **PC** or **HELD** the first SEL is OFF, the second makes the port a
+  host whatever is on the cable.
+- **In**: notes, program changes, CCs, pitch bend, aftertouch, clock and start / continue / stop, as over USB MIDI
+  from a computer (MIDI CH, CC7 VOLUME and AFTERTOUCH apply). **Out**: what the FM-1 sends over USB MIDI. SysEx is
+  not passed either way. A device unplugged with notes or the pedal held has them let go.
+- **While the port looks at a new device** (a second or two after plugging it in, up to about five for one that does
+  not answer) the keys and the screen wait; the sound goes on. A plain charger is recognised and left alone.
+- **The way back**, should the port misbehave: **OCT+ at power-on** (a safe start: a device, USB HOST held), **OCT−
+  at power-on** (the USB rescue), or USB HOST OFF. An update never runs with the port a host.
+- **Not on the SMK-37.**
+
+The driver is Melodee's (Kerem Kilic, Ellic Studio, with recursivefieldinstruments' enumeration and descriptor
+parsing), as ChoralRoot 0.31 (Quixotic7) carries it, where the option is never kept; ported here, with the option
+kept and the power-on check for a computer. `tests/run_usb_host.sh` runs it on a computer against a model of the USB
+controller, a keyboard, hubs, a stick and a charger. **Tried on a unit by this fork: not yet.** ChoralRoot reports
+its own on units with two FM-1s on a cable, and not yet with keyboards or hubs.
+
 ### The second core
 
 The second core starts at power-on and helps the modules that use it: CS-1 plays half its voices there, FM-106 three
@@ -214,7 +262,7 @@ power-off instead of crashing again.
 
 | | |
 | --- | --- |
-| **OCT+ at power-on** | safe start: the sine only, and the radio not started |
+| **OCT+ at power-on** | safe start: the sine only, the radio not started, the USB port a device (USB HOST held) |
 | **OCT− at power-on** | the USB rescue: no sound, only the updater, for any install |
 | **HOME at power-on** | fm1-dock stays, even with a firmware in its boot slot |
 
@@ -303,6 +351,10 @@ The platform underneath is Dinghy's: [docs/API.md](docs/API.md) (everything `pla
 - **The second core and the power-up**: Charles Vestal's [X0X](https://github.com/charlesvestal/fm1-x0x), after Kerem
   Kilic's Melodee, by way of SLOOP's dual-core branch (Andre Rezemini). From Melodee (Kerem Kilic): the supplies'
   start-up, in the form of Optimist's `fm1_supply.h`, and the second core's hold.
+- **USB HOST** (this fork): [Melodee](https://github.com/keremimo/melodee)'s USB MIDI host (Kerem Kilic, Ellic
+  Studio, with recursivefieldinstruments' enumeration and descriptor parsing), by way of
+  [ChoralRoot](https://github.com/Quixotic7/ChoralRootFM1) 0.31 (Quixotic7); the port to fm1-dock, the kept option
+  and the power-on check: this fork.
 - **The SMK-37**: genkigenki's [fm1-to-smk37](https://github.com/genkigenki/fm1-to-smk37) kit and its reference port,
   SLOOP's `smk37` branch.
 - The keys' force sensing comes from Velo, by way of CS-1. The font is Terminus (SIL OFL 1.1).

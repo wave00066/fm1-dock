@@ -23,6 +23,9 @@
 #ifndef FELUCCA_CDC
 #define FELUCCA_CDC 0
 #endif
+#ifndef FM1_USB_HOST
+#define FM1_USB_HOST 0                                  /* dock.c: 1 on the FM-1 (usb_host.c); the update loader: never */
+#endif
 #ifndef FELUCCA_UAC
 #define FELUCCA_UAC 0
 #endif
@@ -139,6 +142,10 @@ static struct {
     uint32_t suspends, max_gap, retries, frame_stalls;   /* diagnostics: suspend events, longest run of polls without SOF */
     uint16_t frame, frame_same;  /* last SOF frame number and how long it has not moved (x 10 ms) */
     uint8_t detached;            /* usb_detach() was called: no retry */
+#ifndef FELUCCA_LOADER
+    uint32_t retry_ms;           /* usb_retry's last attempt (usb_host.c sets it when the port is a device again; the
+                                  * update loader: as it was) */
+#endif
     volatile uint8_t suspended;  /* bus idle > 3 ms (unplugged or host asleep): the UI hides "USB" */
     uint8_t last_setup[8];
     uint8_t sysex[16];
@@ -166,12 +173,13 @@ static volatile uint32_t so_w, so_r;
 #define MQ 64u
 static uint32_t midi_in_q[MQ], midi_out_q[MQ];
 static volatile uint32_t mi_w, mi_r, mo_w, mo_r;
+static int usb_midi_out_ready(void);
 static void midi_out_event(uint32_t pkt)            /* from the audio ISR */
 {
 #ifdef APP_MIDI_OUT
     APP_MIDI_OUT(pkt);                              /* (fm1-dock: BLE MIDI out) */
 #endif
-    if (usb.config && mo_w - mo_r < MQ) {
+    if (usb_midi_out_ready() && mo_w - mo_r < MQ) {
         midi_out_q[mo_w % MQ] = pkt;
         RING_PUBLISH();
         mo_w++;
@@ -1184,9 +1192,26 @@ static void uac_service(void)
 }
 #endif
 
+#include "usb_host.c"                                   /* FM1_USB_HOST: the port as a MIDI host (OPTIONS > USB HOST) */
+
+static int usb_midi_out_ready(void)                     /* MIDI out has somewhere to go: a computer, or a device */
+{
+#if FM1_USB_HOST
+    if (uh.on)
+        return uh.run && uh.out_mps;
+#endif
+    return usb.config != 0;
+}
+
 static void usb_poll(void)                              /* TIMER5 ISR, 2 kHz */
 {
     uint32_t iu, it, ir;
+#if FM1_USB_HOST
+    if (uh.run) {                                       /* a host: the device's endpoints, nothing of the device side */
+        uh_poll();
+        return;
+    }
+#endif
     if (!usb.up)
         return;
     if (fm1_usb_sof_take()) {                           /* SOF pending: not a reliable "host is there", */
@@ -1299,10 +1324,20 @@ static void usb_start(void)                             /* boot, or main-loop re
  * later still enumerates. */
 static void usb_retry(uint32_t now_ms)
 {
+#ifdef FELUCCA_LOADER
     static uint32_t t;
     if (usb.up || usb.detached || now_ms - t < 1000u)
         return;
     t = now_ms;
+#else
+    if (usb.up || usb.detached || now_ms - usb.retry_ms < 1000u)
+        return;
+#if FM1_USB_HOST
+    if (uh.on)
+        return;                                         /* the port is a host: uh_task owns it */
+#endif
+    usb.retry_ms = now_ms;
+#endif
     usb.retries++;
     usb_start();
 }
@@ -1311,5 +1346,9 @@ static void usb_detach(void)
 {
     usb.detached = 1;
     usb.up = 0;
+#if FM1_USB_HOST
+    uh.run = 0;
+    uh.on = uh.want = 0;
+#endif
     fm1_usb_off();
 }

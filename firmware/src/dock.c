@@ -22,8 +22,9 @@
  *              as channel 1, and the keys send on), LOCAL (OFF: the keys only send MIDI), EQ (its page: the
  *              master EQ, eq.c), AFTERTOUCH (the keys' pressure to the module as it comes, or as one value:
  *              channel pressure, the mod wheel or CC 74; at_route), MIDI THRU (the DIN jack's messages on to
- *              USB and BLE-MIDI) and BLUETOOTH
- *              (BLE-MIDI). All off by default.
+ *              USB and BLE-MIDI), USB HOST (the FM-1 only: the USB-C port as the host of a USB MIDI device,
+ *              usb_host.c; ON by default and kept, see usbh_poll) and BLUETOOTH
+ *              (BLE-MIDI). All but USB HOST off by default.
  *   deploys    a module sent over SysEx (tools/dock.py deploy) goes into flash of its own, never
  *              the host's: received whole and checked first, the table written last (see below).
  *   keys       the bottom two rows' force is sensed (Velo's sense.c, by way of CS-1, in the key
@@ -53,12 +54,20 @@
 #define APP_FL_KEEP_LO 0xC0000u                 /* BTIF and the factory calibration: never written (FL_PROTECTED too) */
 #define APP_FL_KEEP_HI 0xC2000u
 #else
+#ifdef HB_BOOT_SLOT
 #define APP_FL_LO 0x14000u                      /* what the host may erase / program besides its settings: the boot */
-#define APP_FL_HI 0xFC000u                      /* slot, the deployed modules, their table, the banks; never the host
+#else                                           /* slot, the deployed modules, their table, the banks; never the host
                                                  * (below; tools/build.py checks that it ends there) */
+#define APP_FL_LO 0x34000u                      /* a release has no boot slot, and with USB HOST the host runs on into
+                                                 * that flash (to the slot table at most, app.ld): not to be written */
+#endif
+#define APP_FL_HI 0xFC000u
 #define SETTINGS_AT 0x95000u                    /* the host's own sector (0xFC000 is a boot firmware's: Felucca's) */
 #define APP_FL_KEEP_LO 0xE7000u                 /* stock's VM with the radio's factory trims (0xE8000) and BTIF: */
 #define APP_FL_KEEP_HI 0xEA000u                 /* never written, whatever else the area may take */
+#endif
+#if !BOARD_SMK37 && !defined(FM1_USB_HOST)
+#define FM1_USB_HOST 1                          /* the USB-C port as a MIDI host (usb_host.c, OPTIONS > USB HOST) */
 #endif
 #define APP_BOOT_HOOK hb_boot_hook
 #define APP_SYSEX hb_sysex
@@ -391,6 +400,7 @@ typedef struct {
 #define OPT_CH_MASK (31u << OPT_CH_SHIFT)
 #define OPT_AT_SHIFT 13u                        /* AFTERTOUCH in bits 13..14: AS IS, CHANNEL, MOD WHL, FILTER (at_route) */
 #define OPT_AT_MASK (3u << OPT_AT_SHIFT)
+#define OPT_USBH_OFF (1u << 15)                 /* USB HOST OFF: the port is always a device (0, the default: a host) */
 static st_t st;
 static uint32_t st_dirty, st_changed;
 
@@ -1191,6 +1201,95 @@ static int din_get(uint8_t *st_, uint8_t *d1, uint8_t *d2)
     }
 }
 
+/* ---- USB HOST (the FM-1; usb_host.c): the USB-C port as the host of a USB MIDI keyboard, controller or synth.
+ * The option is kept (st.spare[1] OPT_USBH_OFF), and ON unless switched off, so the port is a host at every
+ * power-on without a visit to OPTIONS. Three things keep the FM-1 reachable from a computer all the same:
+ *   - the port starts as a device, as ever, and becomes a host only USBH_WAIT_MS later, if no computer has spoken
+ *     to it by then (a SETUP packet: only a host sends one). Plugged into a computer at power-on it stays a device
+ *     until power-off ("PC"), and the installer, deploys and USB audio work as they did;
+ *   - a safe boot (OCT+) and the boot after a failed one leave it a device ("HELD"), as they hold the radio and
+ *     the EQ; the USB rescue (OCT-) and the update never reach this code;
+ *   - SEL on the line switches at once, either way: OFF is a device again within a second.
+ * A computer plugged in later, with the port a host, is not noticed (it pulls nothing up): OFF, or power off and
+ * on. The port is not powered: what hangs on it needs power of its own (a powered hub). */
+#if FM1_USB_HOST
+#define USBH_WAIT_MS 2500u                      /* a computer resets and reads a new device well inside this */
+#define USBH_WAIT_MAX_MS 4000u                  /* (a bus reset seen, no SETUP yet: this long) */
+enum { USBH_OFF, USBH_ON, USBH_MIDI, USBH_PC, USBH_HELD };
+static uint8_t usbh_held;                       /* this power-on stays a device: USBH_PC, USBH_HELD; 0: not held */
+static uint8_t usbh_decided;                    /* the power-on's choice is made */
+static uint8_t usbh_said;                       /* the last UH_MSG_* (the line under OPTIONS says it) */
+static uint32_t usbh_state(void)
+{
+    if (st.spare[1] & OPT_USBH_OFF) return USBH_OFF;
+    if (usbh_held) return usbh_held;
+    return uh.run ? USBH_MIDI : USBH_ON;
+}
+static const char *usbh_text(void)              /* what the port is doing, for OPTIONS' last line; 0: nothing to say */
+{
+    switch (usbh_state()) {
+    case USBH_OFF: return 0;
+    case USBH_PC: return "COMPUTER FOUND AT POWER-ON";
+    case USBH_HELD: return "SAFE BOOT: OFF THIS TIME";
+    case USBH_MIDI: return "MIDI DEVICE CONNECTED";
+    default: break;
+    }
+    switch (usbh_said) {
+    case UH_MSG_NOMIDI: return "NOT A USB MIDI DEVICE";
+    case UH_MSG_LOW: return "LOW-SPEED USB: NOT SUPPORTED";
+    case UH_MSG_NOLINE: return "NOTHING THERE: POWERED HUB?";
+    case UH_MSG_NOANSWER: return "DEVICE NOT ANSWERING";
+    case UH_MSG_HUB_EMPTY: return "HUB: NOTHING ON IT";
+    case UH_MSG_HUB_NOMIDI: return "HUB: NO MIDI DEVICE ON IT";
+    default: return "LOOKING FOR A MIDI DEVICE";
+    }
+}
+static void usbh_boot(uint32_t safe)            /* after the settings and the boot guard */
+{
+    if (st.spare[1] & OPT_USBH_OFF) {
+        usbh_decided = 1;
+    } else if (bootguard.failed || safe) {
+        usbh_held = USBH_HELD;
+        usbh_decided = 1;
+        hb_log("USB HOST saved ON, held this boot");
+    }
+}
+static void usbh_set(uint32_t on)               /* OPTIONS: at once, and kept */
+{
+    st.spare[1] = on ? st.spare[1] & ~OPT_USBH_OFF : st.spare[1] | OPT_USBH_OFF;
+    usbh_held = 0;
+    usbh_decided = 1;
+    usbh_said = 0;
+    uh.want = (uint8_t)!!on;
+}
+static void usbh_poll(void)                     /* the main loop */
+{
+    static const char *const SAY[] = {0, "USB HOST: the port is a host", "USB HOST: the port is a device",
+        "USB HOST: MIDI device connected", "USB HOST: not a USB MIDI device", "USB HOST: low-speed, not supported",
+        "USB HOST: device gone", "USB HOST: nothing on the port", "USB HOST: device not answering",
+        "USB HOST: hub with nothing on it", "USB HOST: hub with no MIDI device"};
+    if (!usbh_decided) {
+        if (usb.setups) {                       /* a host spoke to the FM-1: a computer (or a phone, another FM-1) */
+            usbh_held = USBH_PC;
+            usbh_decided = 1;
+            hb_log("USB HOST: a computer on the port, a device this power-on");
+        } else if (fm1_ms >= (usb.resets ? USBH_WAIT_MAX_MS : USBH_WAIT_MS)) {
+            usbh_decided = 1;
+            uh.want = 1;
+        }
+    }
+    if (uh.msg) {
+        uint32_t m = uh.msg;
+        uh.msg = 0;
+        usbh_said = (uint8_t)m;
+        if (m < sizeof SAY / sizeof SAY[0])
+            hb_log(SAY[m]);
+        if (m >= UH_MSG_NOMIDI && m != UH_MSG_LOST && m != UH_MSG_NOLINE && uh.dg[0])
+            hb_log(uh.dg);                      /* what the search met, in letters (usb_host.c uh_dg) */
+    }
+}
+#endif
+
 /* ---- the screen: the host's line at the top, the picker */
 static void draw_top(int32_t oct)
 {
@@ -1214,16 +1313,23 @@ static void draw_top(int32_t oct)
 }
 
 /* the list, then OPTIONS (past the last module): the host's, ABOUT, then BLUETOOTH (the last line, as it was) */
-enum { O_CC7, O_MASTER_CC7, O_CH, O_LOCAL, O_EQ, O_KNOBS, O_AT, O_THRU };
+enum { O_CC7, O_MASTER_CC7, O_CH, O_LOCAL, O_EQ, O_KNOBS, O_AT, O_THRU, O_USBH };
 #if BOARD_SMK37
-#define N_OPTS_HOST 8u                          /* (no DIN jack: no MIDI THRU, ABOUT in its place) */
+#define N_OPTS_HOST 8u                          /* (no DIN jack: no MIDI THRU, ABOUT in its place; no USB HOST) */
 #else
-#define N_OPTS_HOST 9u
+#define N_OPTS_HOST (9u + FM1_USB_HOST)         /* (USB HOST: after MIDI THRU, before ABOUT) */
 #endif
 #define O_ABOUT (N_OPTS_HOST - 1u)              /* the host's last: its page (draw_about) */
 #define N_OPTS (N_OPTS_HOST + hx_built)
+#if FM1_USB_HOST
+#define OPT_H 15u                               /* (eleven lines above the footer) */
+#define OPT_Y(i) (48u + (i) * OPT_H)
+#define OPT_FOOT 216u
+#else
 #define OPT_H 16u                               /* (ten lines above the footer) */
 #define OPT_Y(i) (50u + (i) * OPT_H)
+#define OPT_FOOT 212u
+#endif
 static const char *const BLE_ST[] = {"OFF", "NO CAL", "HELD", "ON", "LINKED", "READY"};
 static char *put_u(char *p, uint32_t v)         /* v in decimal; the end */
 {
@@ -1234,9 +1340,9 @@ static char *put_u(char *p, uint32_t v)         /* v in decimal; the end */
 }
 static void draw_opt_line(uint32_t o, uint32_t y, uint32_t on_it)
 {
-    static const char *const NAME[] = {"CC7 VOLUME", "MASTER CC7", "MIDI CH", "LOCAL", "EQ", "KNOBS CC", "AFTERTOUCH", "MIDI THRU"};
+    static const char *const NAME[] = {"CC7 VOLUME", "MASTER CC7", "MIDI CH", "LOCAL", "EQ", "KNOBS CC", "AFTERTOUCH", "MIDI THRU", "USB HOST"};
     char v[8] = "OFF";
-    uint32_t lit = 0, opt = st.spare[1];
+    uint32_t lit = 0, held = 0, opt = st.spare[1];
     uint16_t col;
     cv_begin(240, OPT_H, on_it ? RGB(40, 30, 60) : C_BLACK);
     if (o >= N_OPTS_HOST) {                     /* BLUETOOTH and HX's state */
@@ -1270,9 +1376,19 @@ static void draw_opt_line(uint32_t o, uint32_t y, uint32_t on_it)
         uint32_t i = 0;
         do v[i] = t[i]; while (t[i++]);
         break; }
+#if FM1_USB_HOST
+    case O_USBH: { static const char *const UH[] = {"OFF", "ON", "MIDI", "PC", "HELD"};   /* (usbh_state) */
+        uint32_t u = usbh_state();
+        const char *t = UH[u];
+        uint32_t i = 0;
+        do v[i] = t[i]; while (t[i++]);
+        lit = u == USBH_OFF || u == USBH_MIDI;  /* (not as by default, or a device plays) */
+        held = u == USBH_HELD;
+        break; }
+#endif
     default: if ((lit = opt & OPT_THRU) != 0) v[0] = 'O', v[1] = 'N', v[2] = 0; break;
     }
-    col = o == O_EQ && eq_failed ? C_BAD : lit ? C_ACC : C_OFF;
+    col = (o == O_EQ && eq_failed) || held ? C_BAD : lit ? C_ACC : C_OFF;
     cv_text(12, 2, &FONT_S, o == O_ABOUT ? "ABOUT" : NAME[o], on_it ? C_ACC : C_WHITE);
     cv_text(150, 2, &FONT_S, v, col);
     cv_blit(0, y);
@@ -1365,7 +1481,13 @@ static void draw_picker(uint32_t sel)
 #if BOARD_SMK37
         draw_text_box(0, 212, 240, &FONT_S, "SCALE: CHANGE    PATCH: BACK", C_OFF, 1);
 #else
-        draw_text_box(0, 212, 240, &FONT_S, "SEL: CHANGE    HOME: BACK", C_OFF, 1);
+#if FM1_USB_HOST
+        if (sel == n_mods + O_USBH && usbh_text()) {   /* on USB HOST: what the port is doing */
+            draw_text_box(0, OPT_FOOT, 240, &FONT_S, usbh_text(), C_OFF, 1);
+            return;
+        }
+#endif
+        draw_text_box(0, OPT_FOOT, 240, &FONT_S, "SEL: CHANGE    HOME: BACK", C_OFF, 1);
 #endif
         return;
     }
@@ -2542,6 +2664,9 @@ static void app_main(void)
     uint32_t prev = 0, k, full = 1, picker = 0, sel = 0, t_top = 0, held_any = 0, t_notes = 0, safe = 0;
     uint32_t home_t0 = 0, home_alone = 0, home_eaten = 0;   /* HOME held alone 1.5 s: the picker (HB_F_PANEL) */
     uint32_t ble_drawn = HX_S_MISSING + 1u, cc7_drawn = 127u;   /* (the OPTIONS lines as drawn) */
+#if FM1_USB_HOST
+    uint32_t usbh_drawn = ~0u;
+#endif
     uint32_t eqp = 0, eq_row = 0, eq_said = 0;  /* a page open (1 the EQ's, 2 ABOUT), its line; the EQ's failure logged */
     uint32_t sheld = 0, t_press = 0;            /* the sensed keys held (bit k); the pressure's last round */
     int32_t oct_drawn = 99;
@@ -2603,6 +2728,9 @@ static void app_main(void)
     fm1_delay_ms(60);                           /* the key scan sees what is held at power-on */
     safe = (fm1_in.buttons >> BTN_OCT_UP) & 1u;
     ble_boot(safe);
+#if FM1_USB_HOST
+    usbh_boot(safe);
+#endif
     eq_held = (uint8_t)((st.spare[2] & EQ_ON) && (bootguard.failed || safe));   /* (as the radio: a way back from an EQ that misbehaves on the chip) */
     if (eq_held)
         hb_log("EQ saved ON, held this boot");
@@ -2633,6 +2761,9 @@ static void app_main(void)
         uint8_t s, d1, d2;
         const hb_module_t *m;
         platform_poll();
+#if FM1_USB_HOST
+        usbh_poll();
+#endif
         if (cpu1_said != cpu1_state) {          /* the second core's changes, each once */
             if (cpu1_said == CPU1_SCREENING)
                 hb_log_u32(cpu1_state == CPU1_OK ? "cpu1: 2 cores, screened in us" : cpu1_state == CPU1_MISREAD
@@ -2820,6 +2951,12 @@ static void app_main(void)
                 sel = ns < 0 ? 0 : ns > (int32_t)(n_mods + N_OPTS - 1u) ? n_mods + N_OPTS - 1u : (uint32_t)ns;   /* (then OPTIONS) */
                 draw_picker(sel);
             }
+#if FM1_USB_HOST
+            if ((usbh_state() | (uint32_t)usbh_said << 8) != usbh_drawn) {   /* (the line, and what is said under it) */
+                usbh_drawn = usbh_state() | (uint32_t)usbh_said << 8;
+                ble_drawn = HX_S_MISSING + 1u;  /* (drawn again below) */
+            }
+#endif
             if (ble_state() != ble_drawn || cc7 != cc7_drawn) {
                 ble_drawn = ble_state();
                 cc7_drawn = cc7;
@@ -2869,6 +3006,10 @@ static void app_main(void)
                     st.spare[1] = (st.spare[1] & ~OPT_AT_MASK) | (uint32_t)a << OPT_AT_SHIFT;
                 } else if (o == O_THRU && o < O_ABOUT) {   /* (the SMK-37's O_THRU: ABOUT, its page) */
                     st.spare[1] ^= OPT_THRU;
+#if FM1_USB_HOST
+                } else if (o == O_USBH) {       /* ON / OFF, at once and kept (PC, HELD: OFF first, then ON is a host) */
+                    usbh_set(usbh_state() == USBH_OFF);
+#endif
                 }
                 if (o < N_OPTS_HOST)
                     store_touch();

@@ -41,7 +41,7 @@ def pick(name):
     return f"700:8,750:8^,900:e6:{idx},1100:8,1150:8^"
 
 
-O_CC7, O_MASTER_CC7, O_CH, O_LOCAL, O_EQ, O_KNOBS, O_AT, O_THRU, O_ABOUT = range(9)   # the OPTIONS lines (dock.c), past the
+O_CC7, O_MASTER_CC7, O_CH, O_LOCAL, O_EQ, O_KNOBS, O_AT, O_THRU, O_USBH, O_ABOUT = range(10)   # the OPTIONS lines (dock.c), past the
 # list's modules; then BLUETOOTH, the last
 ACC = (180, 140, 255)                   # dock.c C_ACC, as the panel shows it (RGB565)
 
@@ -571,7 +571,7 @@ def main():
     ver = (re.findall(r"fm1-dock (\S+) boot", log) or ["?"])[-1]
     x0, x1 = acc_span("about", 28, 44)
     _, _ = run("about_back", at + ",1500:8,1550:8^", 2000)
-    y = 50 + O_ABOUT * 16                   # (dock.c OPT_Y)
+    y = 48 + O_ABOUT * 15                   # (dock.c OPT_Y, the FM-1's with USB HOST)
     b0, b1 = acc_span("about_back", y, y + 18)
     n = len(f"fm1-dock {ver}") + (10 if "." in ver else 0)   # (a release's: " (abc1234)" after it)
     check("about", re.fullmatch(r"\d\.\d(\.\d)?|[0-9a-f]{7}\+?|unknown", ver) is not None and x0 >= 2 and

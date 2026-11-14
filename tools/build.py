@@ -271,8 +271,12 @@ def pack_slots(host, modules, hx):
     aligned slot, relocated to run there (hbmod.move); HX (BLE-MIDI) at its place at the top"""
     import hbmod
     boot_lo = 0x02000000 + 0x14000 - 0x4000      # hb_module.h HB_BOOT_LO: a boot firmware's first sector
-    if BOARD == "fm1" and APP_XIP + len(host) > boot_lo:
-        raise SystemExit(f"the host ({len(host)} B) runs into the boot slot at flash 0x14000")
+    # (this fork: with USB HOST the FM-1's host is past 0x14000. A release has no boot slot (dock.c: it takes no boot
+    # firmware and starts none), so that flash is only padding there, and the host may use it, up to the slot table;
+    # dock.c's APP_FL_LO keeps the flash driver off it. A --boot-slot build needs the slot: it must still fit below.)
+    if BOARD == "fm1" and BOOT_SLOT and APP_XIP + len(host) > boot_lo:
+        raise SystemExit(f"the host ({len(host)} B) runs into the boot slot at flash 0x14000 "
+                         "(with USB HOST it does not fit beside a boot slot: build with -DFM1_USB_HOST=0)")
     if APP_XIP + len(host) > SLOT_TABLE:
         raise SystemExit(f"the host ({len(host)} B) runs into the slot table at {SLOT_TABLE:#x}")
     img = bytearray(host + b"\xff" * (SLOT_TABLE - APP_XIP - len(host)))
