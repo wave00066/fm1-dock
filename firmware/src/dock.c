@@ -54,9 +54,14 @@
 #define APP_FL_KEEP_LO 0xC0000u                 /* BTIF and the factory calibration: never written (FL_PROTECTED too) */
 #define APP_FL_KEEP_HI 0xC2000u
 #else
+#ifdef HB_BOOT_SLOT
 #define APP_FL_LO 0x14000u                      /* what the host may erase / program besides its settings: the boot */
-#define APP_FL_HI 0xFC000u                      /* slot, the deployed modules, their table, the banks; never the host
+#else                                           /* slot, the deployed modules, their table, the banks; never the host
                                                  * (below; tools/build.py checks that it ends there) */
+#define APP_FL_LO 0x34000u                      /* a release has no boot slot, and with USB HOST the host runs on into
+                                                 * that flash (to the slot table at most, app.ld): not to be written */
+#endif
+#define APP_FL_HI 0xFC000u
 #define SETTINGS_AT 0x95000u                    /* the host's own sector (0xFC000 is a boot firmware's: Felucca's) */
 #define APP_FL_KEEP_LO 0xE7000u                 /* stock's VM with the radio's factory trims (0xE8000) and BTIF: */
 #define APP_FL_KEEP_HI 0xEA000u                 /* never written, whatever else the area may take */
