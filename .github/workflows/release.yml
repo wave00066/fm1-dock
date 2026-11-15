@@ -22,8 +22,10 @@ jobs:
         if [ "$GITHUB_REF_TYPE" = tag ]; then set -- --release "${GITHUB_REF_NAME#v}"; else set --; fi
         for m in pro elite mke; do ./build.sh --board smk37 --model "$m" "$@"; done
         ./build.sh "$@"
-      # (this fork: CS-1 and Scintilla, out of the FM-1's package, as files to deploy; the FM-1's build is the last)
+      # (this fork: OberVave, CS-1 and Scintilla, out of the FM-1's package, as files to deploy; the FM-1's build is
+      # the last)
       packages: |
         build/fm1-dock*.fwsc
+        build/modules/obervave.dock
         build/modules/cs1.dock
         build/modules/scintilla.dock
