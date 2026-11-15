@@ -33,7 +33,8 @@
  * per-endpoint function address), RXMAXP is 0xFF as everywhere in this firmware. Not driven: VBUS (the port
  * needs outside power, e.g. a powered hub), low-speed devices. OUT drains the MIDI out ring only after the target
  * ACKs; no SysEx/editor traffic is sent to attached devices.
- * Tested against a model of the SIE and of the devices (tests/usb_host_test.c), not on an FM-1 by this port. */
+ * Tested against a model of the SIE and of the devices (tests/usb_host_test.c). Built for the SMK-37 too (the same
+ * chip, the same USB0): not tried there. */
 #if FM1_USB_HOST
 #include "usb_host_desc.h"
 
