@@ -34,8 +34,11 @@
 > `python3 tools/fm1_install.py <file>.fwsc` (below); upstream's page installs upstream's fm1-dock, without USB HOST.
 > Modules, settings and presets stay, and upstream's catalog adds modules to it as to any fm1-dock.
 >
-> **HYP-1 comes with it** (the FM-1's package: CS-1, **HYP-1**, OberVave and the sine; Scintilla is no longer in the
-> package, and is still built as `scintilla.dock` to deploy). HYP-1 is
+> **HYP-1 comes with it.** The FM-1's package is **HYP-1**, OberVave, PROPHET and the sine: the two 152 KiB modules and
+> the small one that fits beside them. CS-1 and Scintilla are no longer in the package; this fork's releases carry
+> `cs1.dock` and `scintilla.dock`, added like any module (the page's console: **Choose .dock…**, or
+> `tools/dock.py deploy cs1.dock`) into the 296 KiB of the added modules, where FMINI-1, FM-106, FM6 and CS-1 fit
+> together. The SMK-37's packages are upstream's. HYP-1 is
 > [RustyPawz's hypnotic techno and acid machine](https://github.com/RustyPawz/fm1-HYP1) (RedtailWorks, 1.5.0), a whole
 > firmware of its own, here as a module (`modules/hyp/`): its app and engine unchanged but for a module's RAM. What
 > differs from HYP-1 alone: **HOME held 1.5 s** opens fm1-dock's module list (a short HOME is HYP-1's TEMPO page);

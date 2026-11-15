@@ -194,8 +194,9 @@ def build_loader():
 APP = "fm1-dock"                    # the outputs' name (--name) (build/fm1-dock.bin, .fwsc, .syms, ...)
 HOST = "dock"
 PACKAGE = ["cs1", "scintilla", "obervave"]   # the modules in the package (all of modules/ no longer fits its app slot)
-PACKAGE_FM1 = ["cs1", "hyp", "obervave"]     # (this fork, the FM-1: HYP-1 in Scintilla's place; Scintilla is still built,
-                                             # build/modules/scintilla.dock, to deploy. The SMK-37: upstream's three)                       # the host's source: firmware/src/dock.c
+PACKAGE_FM1 = ["hyp", "obervave", "prophet"]   # (this fork, the FM-1: HYP-1, OberVave and PROPHET fill the package's
+                                               # 332 KiB; CS-1 and Scintilla are still built, build/modules/*.dock, to
+                                               # deploy as any module is. The SMK-37: upstream's three)
 SLOT_TABLE = 0x02030000             # firmware/src/dock.c HB_TABLE_AT (flash 0x34000)
 SLOT_FIRST = SLOT_TABLE + 0x1000
 HX_XIP = 0x02084000                 # firmware/src/ble/hx.h HX_AT (flash 0x88000): BLE-MIDI, a unit of its own (SMK-37: main)
