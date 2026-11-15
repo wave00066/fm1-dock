@@ -25,14 +25,31 @@
 </p>
 
 > **This is a fork** of [joakimeriksson/fm1-dock](https://github.com/joakimeriksson/fm1-dock) that adds
-> **[USB HOST](#usb-host-this-fork)**: the FM-1's USB-C port as the host of a USB MIDI keyboard, controller or
-> synth, on at every power-on and switched off in OPTIONS. Everything else is fm1-dock's, and its page, catalog and
-> installer are upstream's. **The USB host code has passed its tests on a computer, against a model of the USB
-> controller. It has not yet been run on an FM-1 by this fork.**
+> **[USB HOST](#usb-host-this-fork)**: the USB-C port as the host of a USB MIDI keyboard, controller or
+> synth, on at every power-on and switched off in OPTIONS, and **HYP-1** as a module. Everything else is fm1-dock's,
+> and its page, catalog and installer are upstream's. The USB host code passes its tests on a computer, against a
+> model of the USB controller. The fork's 0.8.2-usbhost2 is installed and played on an FM-1 (its owner's report:
+> the package, HYP-1, the added modules and sounds sent to FM6 and PROPHET work). **On the SMK-37 nothing of this
+> fork has been tried**, and upstream's fm1-dock itself is not yet tried on a real SMK-37 ([SMK37.md](SMK37.md)).
 >
 > To install it, take `fm1-dock-…-usbhost….fwsc` from **this fork's** Releases and write it with
 > `python3 tools/fm1_install.py <file>.fwsc` (below); upstream's page installs upstream's fm1-dock, without USB HOST.
 > Modules, settings and presets stay, and upstream's catalog adds modules to it as to any fm1-dock.
+>
+> **HYP-1 comes with it.** The FM-1's package is **HYP-1**, FM-106, FM6, PROPHET and the sine (328 of its 332 KiB).
+> OberVave, CS-1 and Scintilla are no longer in the package; this fork's releases carry `obervave.dock`, `cs1.dock`
+> and `scintilla.dock`, added like any module (the page's console: **Choose .dock…**, or
+> `tools/dock.py deploy obervave.dock`) into the 296 KiB of the added modules, where OberVave, CS-1 and FMINI-1 fit
+> together with 24 KiB to spare. **The SMK-37's packages** are HYP-1, FM-106 and FM6 (296 of 304 KiB: PROPHET does
+> not fit there too); `prophet.dock`, `obervave.dock`, `cs1.dock` and `fmini.dock` go into its 416 KiB of added
+> modules. HYP-1 is
+> [RustyPawz's hypnotic techno and acid machine](https://github.com/RustyPawz/fm1-HYP1) (RedtailWorks, 1.5.0), a whole
+> firmware of its own, here as a module (`modules/hyp/`): its app and engine unchanged but for a module's RAM. What
+> differs from HYP-1 alone: **HOME held 1.5 s** opens fm1-dock's module list (a short HOME is HYP-1's TEMPO page);
+> MASTER, USB audio, MIDI THRU, Bluetooth and USB HOST are fm1-dock's; its saved pieces are kept in fm1-dock's store,
+> not where HYP-1 alone keeps them (they do not carry over); the performance FX's ring is 0.5 s where HYP-1 has 0.95
+> (beat repeat's longest loop is a quarter note, reverse plays back half a second), and the reverb's delay lines are
+> 16-bit; no update mode on OCT− + OCT+ and no panel setup page (the host's). **Not yet played on an FM-1.**
 
 fm1-dock is installed once. The synths are modules in its flash: hold HOME, pick another one, play. No reinstall.
 Fifteen synths so far, each its author's own code: three come with it (and a sine), twelve more go in from the page
@@ -195,7 +212,7 @@ fm1-dock starts whatever played last. The options, for every module:
 | **KNOBS CC** | ON: KNOB1..4 send CC 74, 71, 73, 72 (cutoff, resonance, attack, release) over USB and BLE-MIDI instead of turning the module's knobs. OFF by default |
 | **AFTERTOUCH** | How the keys' pressure (and an external keyboard's poly or channel aftertouch) reaches the synth: **AS IS** (default) as it comes, per key; **CHANNEL** as channel pressure; **MOD WHL** as CC 1; **FILTER** as CC 74. The last three send the hardest-pressed key's pressure, for synths that do nothing with poly pressure. The MIDI sent out stays poly |
 | **MIDI THRU** | ON: the TRS MIDI jack's input (not clock or SysEx) goes on to USB-MIDI and BLE-MIDI, and the module plays it too. OFF by default |
-| **USB HOST** (the FM-1 only; this fork) | ON (the default, and kept): the USB-C port is the host of a USB MIDI device, [below](#usb-host-this-fork). OFF: the port is always a device, as in fm1-dock |
+| **USB HOST** (this fork) | ON (the default, and kept): the USB-C port is the host of a USB MIDI device, [below](#usb-host-this-fork). OFF: the port is always a device, as in fm1-dock |
 | **ABOUT** | **SEL**: a page with the version (a release's `0.8.2 (abc1234)` with its source; any other build's is its source, git's short hash, `+` with changes not committed), the board and model, 1CPU / 2CPU, the chip, the flash chip's JEDEC id and size, the module RAM, the add-ons' free flash (all and the largest piece), the BLE address, and each module's name, version and KiB. **SELECT / PRESETS** scroll, **HOME** goes back |
 | **BLUETOOTH** | BLE-MIDI, OFF by default (below) |
 
@@ -244,7 +261,7 @@ every power-on.
   not answer) the keys and the screen wait; the sound goes on. A plain charger is recognised and left alone.
 - **The way back**, should the port misbehave: **OCT+ at power-on** (a safe start: a device, USB HOST held), **OCT−
   at power-on** (the USB rescue), or USB HOST OFF. An update never runs with the port a host.
-- **Not on the SMK-37.**
+- **On the SMK-37 too** (the same chip and USB port; its line is the one before ABOUT). Not tried on one.
 
 The driver is Melodee's (Kerem Kilic, Ellic Studio, with recursivefieldinstruments' enumeration and descriptor
 parsing), as ChoralRoot 0.31 (Quixotic7) carries it, where the option is never kept; ported here, with the option

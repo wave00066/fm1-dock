@@ -7,6 +7,12 @@ FM-106, MONK-1, FiMba-1, GATOR, DUB-1, FM-1 SID, AMB-1 and FoMni added from [the
 need to know: the SMK's panel reaches it as an FM-1's, and what the FM-1 does not have (the outer keys, the pads, the
 faders, the wheels) reaches it as MIDI.
 
+> **This fork** (wave00066/fm1-dock): the SMK-37's packages hold **HYP-1, FM-106 and FM6** in place of CS-1, Scintilla
+> and OberVave (which the fork's releases carry as `.dock` files, with `prophet.dock` and `fmini.dock`), and
+> **OPTIONS > USB HOST** is there as on the FM-1 (the line before ABOUT; README, USB HOST). HYP-1 here is the FM-1's
+> HYP-1 as a module: the SMK-37 port's pads, faders and FM voice are not in it. None of it has been tried on an
+> SMK-37.
+
 > **Status**: built and tested in [fm1-emu](https://github.com/joakimeriksson/fm1-emu), which runs the SMK-37
 > (`tests/smk_test.py`: the keys and their velocity, the pads, faders and wheels, the module list, deploys into both
 > areas, BLE-MIDI's start-up, the USB rescue). Not yet tried on a real SMK-37.

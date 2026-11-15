@@ -22,4 +22,12 @@ jobs:
         if [ "$GITHUB_REF_TYPE" = tag ]; then set -- --release "${GITHUB_REF_NAME#v}"; else set --; fi
         for m in pro elite mke; do ./build.sh --board smk37 --model "$m" "$@"; done
         ./build.sh "$@"
-      packages: build/fm1-dock*.fwsc
+      # (this fork: the modules out of the packages, and PROPHET and FMINI-1 for the SMK-37, as files to deploy; a
+      # .dock is the same for every board)
+      packages: |
+        build/fm1-dock*.fwsc
+        build/modules/obervave.dock
+        build/modules/prophet.dock
+        build/modules/fmini.dock
+        build/modules/cs1.dock
+        build/modules/scintilla.dock

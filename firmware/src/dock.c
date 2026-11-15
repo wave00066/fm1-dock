@@ -22,7 +22,7 @@
  *              as channel 1, and the keys send on), LOCAL (OFF: the keys only send MIDI), EQ (its page: the
  *              master EQ, eq.c), AFTERTOUCH (the keys' pressure to the module as it comes, or as one value:
  *              channel pressure, the mod wheel or CC 74; at_route), MIDI THRU (the DIN jack's messages on to
- *              USB and BLE-MIDI), USB HOST (the FM-1 only: the USB-C port as the host of a USB MIDI device,
+ *              USB and BLE-MIDI), USB HOST (the USB-C port as the host of a USB MIDI device,
  *              usb_host.c; ON by default and kept, see usbh_poll) and BLUETOOTH
  *              (BLE-MIDI). All but USB HOST off by default.
  *   deploys    a module sent over SysEx (tools/dock.py deploy) goes into flash of its own, never
@@ -66,8 +66,9 @@
 #define APP_FL_KEEP_LO 0xE7000u                 /* stock's VM with the radio's factory trims (0xE8000) and BTIF: */
 #define APP_FL_KEEP_HI 0xEA000u                 /* never written, whatever else the area may take */
 #endif
-#if !BOARD_SMK37 && !defined(FM1_USB_HOST)
-#define FM1_USB_HOST 1                          /* the USB-C port as a MIDI host (usb_host.c, OPTIONS > USB HOST) */
+#ifndef FM1_USB_HOST
+#define FM1_USB_HOST 1                          /* the USB-C port as a MIDI host (usb_host.c, OPTIONS > USB HOST); the
+                                                 * SMK-37 too: the same chip and the same USB0 */
 #endif
 #define APP_BOOT_HOOK hb_boot_hook
 #define APP_SYSEX hb_sysex
@@ -1201,7 +1202,7 @@ static int din_get(uint8_t *st_, uint8_t *d1, uint8_t *d2)
     }
 }
 
-/* ---- USB HOST (the FM-1; usb_host.c): the USB-C port as the host of a USB MIDI keyboard, controller or synth.
+/* ---- USB HOST (usb_host.c): the USB-C port as the host of a USB MIDI keyboard, controller or synth.
  * The option is kept (st.spare[1] OPT_USBH_OFF), and ON unless switched off, so the port is a host at every
  * power-on without a visit to OPTIONS. Three things keep the FM-1 reachable from a computer all the same:
  *   - the port starts as a device, as ever, and becomes a host only USBH_WAIT_MS later, if no computer has spoken
@@ -1313,15 +1314,16 @@ static void draw_top(int32_t oct)
 }
 
 /* the list, then OPTIONS (past the last module): the host's, ABOUT, then BLUETOOTH (the last line, as it was) */
-enum { O_CC7, O_MASTER_CC7, O_CH, O_LOCAL, O_EQ, O_KNOBS, O_AT, O_THRU, O_USBH };
+enum { O_CC7, O_MASTER_CC7, O_CH, O_LOCAL, O_EQ, O_KNOBS, O_AT, O_THRU };
 #if BOARD_SMK37
-#define N_OPTS_HOST 8u                          /* (no DIN jack: no MIDI THRU, ABOUT in its place; no USB HOST) */
+#define N_OPTS_HOST (8u + FM1_USB_HOST)         /* (no DIN jack: no MIDI THRU, USB HOST or ABOUT in its place) */
 #else
 #define N_OPTS_HOST (9u + FM1_USB_HOST)         /* (USB HOST: after MIDI THRU, before ABOUT) */
 #endif
 #define O_ABOUT (N_OPTS_HOST - 1u)              /* the host's last: its page (draw_about) */
+#define O_USBH (N_OPTS_HOST - 2u)               /* (FM1_USB_HOST only: the line before ABOUT; the SMK-37's O_THRU) */
 #define N_OPTS (N_OPTS_HOST + hx_built)
-#if FM1_USB_HOST
+#if FM1_USB_HOST && !BOARD_SMK37
 #define OPT_H 15u                               /* (eleven lines above the footer) */
 #define OPT_Y(i) (48u + (i) * OPT_H)
 #define OPT_FOOT 216u
@@ -1340,7 +1342,7 @@ static char *put_u(char *p, uint32_t v)         /* v in decimal; the end */
 }
 static void draw_opt_line(uint32_t o, uint32_t y, uint32_t on_it)
 {
-    static const char *const NAME[] = {"CC7 VOLUME", "MASTER CC7", "MIDI CH", "LOCAL", "EQ", "KNOBS CC", "AFTERTOUCH", "MIDI THRU", "USB HOST"};
+    static const char *const NAME[] = {"CC7 VOLUME", "MASTER CC7", "MIDI CH", "LOCAL", "EQ", "KNOBS CC", "AFTERTOUCH", "MIDI THRU"};
     char v[8] = "OFF";
     uint32_t lit = 0, held = 0, opt = st.spare[1];
     uint16_t col;
@@ -1389,7 +1391,8 @@ static void draw_opt_line(uint32_t o, uint32_t y, uint32_t on_it)
     default: if ((lit = opt & OPT_THRU) != 0) v[0] = 'O', v[1] = 'N', v[2] = 0; break;
     }
     col = (o == O_EQ && eq_failed) || held ? C_BAD : lit ? C_ACC : C_OFF;
-    cv_text(12, 2, &FONT_S, o == O_ABOUT ? "ABOUT" : NAME[o], on_it ? C_ACC : C_WHITE);
+    cv_text(12, 2, &FONT_S, o == O_ABOUT ? "ABOUT" : FM1_USB_HOST && o == O_USBH ? "USB HOST" : NAME[o],
+            on_it ? C_ACC : C_WHITE);
     cv_text(150, 2, &FONT_S, v, col);
     cv_blit(0, y);
 }
@@ -1478,15 +1481,15 @@ static void draw_picker(uint32_t sel)
         draw_text_box(0, 30, 240, &FONT_S, "OPTIONS", C_OFF, 1);
         for (i = 0; i < N_OPTS; i++)
             draw_opt_line(i, OPT_Y(i), sel == n_mods + i);
-#if BOARD_SMK37
-        draw_text_box(0, 212, 240, &FONT_S, "SCALE: CHANGE    PATCH: BACK", C_OFF, 1);
-#else
 #if FM1_USB_HOST
         if (sel == n_mods + O_USBH && usbh_text()) {   /* on USB HOST: what the port is doing */
             draw_text_box(0, OPT_FOOT, 240, &FONT_S, usbh_text(), C_OFF, 1);
             return;
         }
 #endif
+#if BOARD_SMK37
+        draw_text_box(0, OPT_FOOT, 240, &FONT_S, "SCALE: CHANGE    PATCH: BACK", C_OFF, 1);
+#else
         draw_text_box(0, OPT_FOOT, 240, &FONT_S, "SEL: CHANGE    HOME: BACK", C_OFF, 1);
 #endif
         return;
@@ -3004,12 +3007,13 @@ static void app_main(void)
                     at_send(m, 0, 0);           /* (the old way lets go first: the wheel or the filter back) */
                     at_reset();
                     st.spare[1] = (st.spare[1] & ~OPT_AT_MASK) | (uint32_t)a << OPT_AT_SHIFT;
-                } else if (o == O_THRU && o < O_ABOUT) {   /* (the SMK-37's O_THRU: ABOUT, its page) */
-                    st.spare[1] ^= OPT_THRU;
 #if FM1_USB_HOST
-                } else if (o == O_USBH) {       /* ON / OFF, at once and kept (PC, HELD: OFF first, then ON is a host) */
+                } else if (o == O_USBH) {       /* ON / OFF, at once and kept (PC, HELD: OFF first, then ON is a host).
+                                                 * (Before O_THRU: the SMK-37's seventh line is this one.) */
                     usbh_set(usbh_state() == USBH_OFF);
 #endif
+                } else if (o == O_THRU && o < O_ABOUT) {   /* (the SMK-37's O_THRU: USB HOST or ABOUT, above) */
+                    st.spare[1] ^= OPT_THRU;
                 }
                 if (o < N_OPTS_HOST)
                     store_touch();
