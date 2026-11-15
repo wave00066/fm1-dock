@@ -193,7 +193,9 @@ def build_loader():
 
 APP = "fm1-dock"                    # the outputs' name (--name) (build/fm1-dock.bin, .fwsc, .syms, ...)
 HOST = "dock"
-PACKAGE = ["cs1", "scintilla", "obervave"]   # the modules in the package (all of modules/ no longer fits its app slot)                       # the host's source: firmware/src/dock.c
+PACKAGE = ["cs1", "scintilla", "obervave"]   # the modules in the package (all of modules/ no longer fits its app slot)
+PACKAGE_FM1 = ["cs1", "hyp", "obervave"]     # (this fork, the FM-1: HYP-1 in Scintilla's place; Scintilla is still built,
+                                             # build/modules/scintilla.dock, to deploy. The SMK-37: upstream's three)                       # the host's source: firmware/src/dock.c
 SLOT_TABLE = 0x02030000             # firmware/src/dock.c HB_TABLE_AT (flash 0x34000)
 SLOT_FIRST = SLOT_TABLE + 0x1000
 HX_XIP = 0x02084000                 # firmware/src/ble/hx.h HX_AT (flash 0x88000): BLE-MIDI, a unit of its own (SMK-37: main)
@@ -451,7 +453,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     import hbmod
     every = sorted(d for d in (SRC / "modules").iterdir() if d.is_dir() and d.name != "lib" and any(d.glob("*.c")))
-    dirs = [Path(d).resolve() if "/" in d else SRC / "modules" / d for d in (a.modules or ",".join(PACKAGE)).split(",")]
+    dirs = [Path(d).resolve() if "/" in d else SRC / "modules" / d for d in (a.modules or ",".join(PACKAGE_FM1 if BOARD == "fm1" else PACKAGE)).split(",")]
     ota = build_loader()
     host, syms, dis, rt, hx = build_app()
     errors, notes = check(host, syms, dis, rt)

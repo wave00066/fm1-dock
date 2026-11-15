@@ -33,6 +33,16 @@
 > To install it, take `fm1-dock-…-usbhost….fwsc` from **this fork's** Releases and write it with
 > `python3 tools/fm1_install.py <file>.fwsc` (below); upstream's page installs upstream's fm1-dock, without USB HOST.
 > Modules, settings and presets stay, and upstream's catalog adds modules to it as to any fm1-dock.
+>
+> **HYP-1 comes with it** (the FM-1's package: CS-1, **HYP-1**, OberVave and the sine; Scintilla is no longer in the
+> package, and is still built as `scintilla.dock` to deploy). HYP-1 is
+> [RustyPawz's hypnotic techno and acid machine](https://github.com/RustyPawz/fm1-HYP1) (RedtailWorks, 1.5.0), a whole
+> firmware of its own, here as a module (`modules/hyp/`): its app and engine unchanged but for a module's RAM. What
+> differs from HYP-1 alone: **HOME held 1.5 s** opens fm1-dock's module list (a short HOME is HYP-1's TEMPO page);
+> MASTER, USB audio, MIDI THRU, Bluetooth and USB HOST are fm1-dock's; its saved pieces are kept in fm1-dock's store,
+> not where HYP-1 alone keeps them (they do not carry over); the performance FX's ring is 0.5 s where HYP-1 has 0.95
+> (beat repeat's longest loop is a quarter note, reverse plays back half a second), and the reverb's delay lines are
+> 16-bit; no update mode on OCT− + OCT+ and no panel setup page (the host's). **Not yet played on an FM-1.**
 
 fm1-dock is installed once. The synths are modules in its flash: hold HOME, pick another one, play. No reinstall.
 Fifteen synths so far, each its author's own code: three come with it (and a sine), twelve more go in from the page
